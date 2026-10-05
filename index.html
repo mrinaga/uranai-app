@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>旅の運勢占い</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #e7f7ee;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    h1 {
+      color: #d94f7a;
+      font-size: 28px;
+    }
+    p {
+      color: #555555;
+    }
+    label {
+      display: block;
+      margin: 16px 0;
+      font-size: 18px;
+    }
+    input, select {
+      font-size: 18px;
+      padding: 8px;
+      margin-top: 8px;
+    }
+    button {
+      background-color: #d94f7a;
+      color: white;
+      font-size: 20px;
+      padding: 16px 40px;
+      border: none;
+      border-radius: 999px;
+      margin-top: 8px;
+    }
+
+    /* ここからレシートの見た目 */
+    #result {
+      display: none;
+      background-color: white;
+      max-width: 320px;
+      margin: 32px auto;
+      padding: 20px;
+      text-align: left;
+      font-size: 15px;
+      line-height: 1.7;
+      border: 1px dashed #999999;
+    }
+    #result p {
+      margin: 10px 0;
+      color: #333333;
+    }
+    #result hr {
+      border: none;
+      border-top: 1px dashed #999999;
+    }
+    .receipt-title {
+      text-align: center;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .label {
+      font-weight: bold;
+    }
+    .receipt-footer {
+      text-align: center;
+      color: #999999;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h1>旅の相棒を見つけてみませんか？</h1>
+  <p>道の駅サラブレッドロード新冠</p>
+
+  <label>
+    生年月日
+    <br>
+    <input type="date" id="birthday">
+  </label>
+
+  <label>
+    今日の気分・気になること
+    <br>
+    <select id="mood">
+      <option value="">選んでください</option>
+      <option>元気いっぱい</option>
+      <option>ちょっと疲れ気味</option>
+      <option>やる気が出なくて困っている</option>
+      <option>恋愛が気になる</option>
+      <option>仕事・勉強が気になる</option>
+    </select>
+  </label>
+
+  <button id="startButton">占いをはじめる</button>
+  <div id="result"></div>
+
+  <script>
+    const button = document.getElementById("startButton");
+    const result = document.getElementById("result");
+    const birthday = document.getElementById("birthday");
+    const mood = document.getElementById("mood");
+
+    // 運勢の星
+    const fortunes = ["★★★★★", "★★★★☆", "★★★☆☆"];
+
+    // 気分ごとのひとこと
+    const moodAdvice = {
+      "元気いっぱい": "その元気が今日いちばんの武器。気になっていた場所に、思い切って足をのばしてみて。",
+      "ちょっと疲れ気味": "今日は全力疾走より、ゆっくり歩くペースが吉。おいしいものを食べて、ひと休みしてから出発しよう。",
+      "やる気が出なくて困っている": "大きな目標より「5分だけやる」くらいの小さなスタートが吉。一歩出てしまえば、自然とペースに乗れる日です。",
+      "恋愛が気になる": "焦って前に出るより、相手の走りに合わせてみると吉。何気ない一言が、距離を縮めるきっかけになりそう。",
+      "仕事・勉強が気になる": "最初からトップスピードを狙わなくて大丈夫。最後の直線で伸びるように、今は力をためる時期です。"
+    };
+
+    // 走り方ごとの性格
+    const styleTexts = {
+      "逃げ": "本当は先頭を切って走りたい行動派。思い立ったらすぐ動けるのがあなたの強みです。",
+      "先行": "前のほうで流れをつかむのが上手な、しっかり者タイプ。周りからの信頼も厚い人です。",
+      "差し": "周りをよく見て、ここぞという場面で力を出す作戦家タイプ。冷静さがあなたの武器です。",
+      "追込": "最初はのんびりでも、最後にぐんと伸びる大器晩成タイプ。マイペースこそあなたの持ち味です。"
+    };
+
+    // 新冠のラッキープレイスとグルメ（本番では道の駅と相談して決める）
+    const luckyPlaces = ["サラブレッド銀座", "レ・コード館", "判官館森林公園", "新冠温泉 レ・コードの湯"];
+    const luckyFoods = ["ソフトクリーム", "新冠産ピーマンを使ったメニュー", "道の駅のおみやげスイーツ"];
+
+    // 走り方の種類
+    const styles = ["逃げ", "先行", "差し", "追込"];
+
+    // 誕生月と毛色の対応（資料2-6の表。1月から順番に12個）
+    const monthColors = ["栗毛", "鹿毛", "黒鹿毛", "青鹿毛", "青毛", "栃栗毛",
+                         "芦毛", "白毛", "栗毛", "鹿毛", "黒鹿毛", "芦毛"];
+
+    // 登録馬（資料2-7のデモ用15頭）
+    const horses = [
+      { name: "ゴールドシップ", color: "芦毛", styles: ["追込"], personality: "非常に賢く、気まぐれで王様気質" },
+      { name: "ステイゴールド", color: "黒鹿毛", styles: ["差し"], personality: "負けず嫌いで、自分が一番偉いと信じる王様型" },
+      { name: "ジャスタウェイ", color: "鹿毛", styles: ["差し"], personality: "非常に真面目で、おとなしい優等生" },
+      { name: "イクイノックス", color: "青鹿毛", styles: ["先行"], personality: "非常に知的でおとなしく、甘えん坊で素直" },
+      { name: "ハルウララ", color: "鹿毛", styles: ["追込"], personality: "臆病で神経質、でも頑固でわがまま" },
+      { name: "アーモンドアイ", color: "鹿毛", styles: ["先行"], personality: "普段はおっとり、スイッチが入ると凄まじい闘争心" },
+      { name: "ナリタブライアン", color: "黒鹿毛", styles: ["先行"], personality: "実は非常に臆病でデリケート" },
+      { name: "ソダシ", color: "白毛", styles: ["先行", "逃げ"], personality: "普段は人懐っこい甘えん坊、レースでは激しくデリケート" },
+      { name: "テイエムオペラオー", color: "栗毛", styles: ["先行"], personality: "プライドが高く知性的な王様気質" },
+      { name: "メイショウドトウ", color: "鹿毛", styles: ["先行"], personality: "非常に大人しく、おっとりした超癒やし系" },
+      { name: "ハイセイコー", color: "鹿毛", styles: ["先行"], personality: "知的で従順、少し寂しがり屋な優等生" },
+      { name: "トウカイテイオー", color: "鹿毛", styles: ["先行"], personality: "プライドが高く負けず嫌いなお坊ちゃま" },
+      { name: "オグリキャップ", color: "芦毛", styles: ["差し"], personality: "大人しく真面目で、驚異的な食いしん坊" },
+      { name: "メジロマックイーン", color: "芦毛", styles: ["先行"], personality: "頭が良く、プライドが抜群に高い優雅な大貴族" },
+      { name: "コントレイル", color: "青鹿毛", styles: ["先行"], personality: "頭が良い優等生だが、実は超・寂しがり屋で甘えん坊" }
+    ];
+
+    // リストからランダムに1つ選ぶ道具
+    function pickRandom(list) {
+      return list[Math.floor(Math.random() * list.length)];
+    }
+
+    // 数字を2けたにする道具（5 → "05"）
+    function twoDigits(number) {
+      return String(number).padStart(2, "0");
+    }
+
+    button.addEventListener("click", function () {
+      result.style.display = "block";
+
+      if (birthday.value === "" || mood.value === "") {
+        result.innerHTML = "<p>生年月日と今日の気分を選んでね</p>";
+        return;
+      }
+
+      const parts = birthday.value.split("-");
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+
+      // 仮の判定：生年月日の数字を足して、4で割った余りで走り方を決める
+      const style = styles[(year + month + day) % 4];
+
+      // 同じ走り方の馬を探す
+      const candidates = horses.filter(function (horse) {
+        return horse.styles.includes(style);
+      });
+
+      // 誕生月の毛色
+      const monthColor = monthColors[month - 1];
+
+      // 最終的に選ぶ候補
+      let finalCandidates = candidates;
+
+      // ルール4：候補が4頭以上なら、誕生月の毛色で絞り込む
+      if (candidates.length >= 4) {
+        const sameColor = candidates.filter(function (horse) {
+          return horse.color === monthColor;
+        });
+
+        // ルール5：毛色が合う馬がいたときだけ絞る
+        if (sameColor.length > 0) {
+          finalCandidates = sameColor;
+        }
+      }
+
+      // 生年月日の「日」を使って1頭に決める
+      const horse = finalCandidates[day % finalCandidates.length];
+
+      // 確認用（F12のConsoleにだけ表示される）
+      console.log("走り方:", style, "／誕生月の毛色:", monthColor);
+      console.log("絞り込み後:", finalCandidates);
+
+      // 占った日時
+      const now = new Date();
+      const dateText = now.getFullYear() + "年" + (now.getMonth() + 1) + "月" + now.getDate() + "日 "
+                     + twoDigits(now.getHours()) + ":" + twoDigits(now.getMinutes());
+
+      // 運勢・ラッキープレイス・グルメ
+      const stars = pickRandom(fortunes);
+      const advice = moodAdvice[mood.value] || "今日は自分のペースを大切にすると吉。";
+      const place = pickRandom(luckyPlaces);
+      const food = pickRandom(luckyFoods);
+
+      // レシートを組み立てる（資料2-5の順番）
+      result.innerHTML = `
+        <div class="receipt-title">占い結果レシート</div>
+        <hr>
+        <p><span class="label">占った日時・場所</span><br>${dateText}<br>道の駅サラブレッドロード新冠</p>
+        <p><span class="label">生年月日</span><br>${year}年${month}月${day}日</p>
+        <p><span class="label">気になること</span><br>${mood.value}</p>
+        <hr>
+        <p><span class="label">あなたの今日の運勢</span><br>${stars}<br>${advice}</p>
+        <p><span class="label">旅のラッキープレイス</span><br>${place}</p>
+        <p><span class="label">ラッキーグルメ</span><br>${food}</p>
+        <hr>
+        <p><span class="label">隠れた性格：走り方は「${style}」</span><br>${styleTexts[style]}</p>
+        <p><span class="label">馬に例えたら</span><br>${horse.name}（${horse.color}・${horse.styles.join("・")}）<br>${horse.personality}</p>
+        <hr>
+        <p class="receipt-footer">（ここにイラストが入る予定）</p>
+      `;
+    });
+  </script>
+</body>
+</html>
