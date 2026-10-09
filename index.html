@@ -454,14 +454,15 @@
 
       const traits = {};
       traits[first.key] = 1.0;
-      traits[second.key] = 0.7;
+      traits[second.key] = 0.6;
 
       // 気分から出る性格（見つからなければ足さない）
       const found = moodTraits.find(function (m) {
         return m.words.some(function (w) { return moodValue.includes(w); });
       });
+      // 気分の影響をいちばん強くして、気分を変えると相棒も変わるようにしている
       if (found) {
-        traits[found.key] = (traits[found.key] || 0) + 0.6;
+        traits[found.key] = (traits[found.key] || 0) + 1.2;
       }
 
       // 強い順に並べた名前（レシート用）
@@ -496,7 +497,7 @@
       const scored = horses.map(function (horse) {
         let score = similarity(person.traits, horseTraits(horse));
         if (horse.styles.includes(style)) {
-          score += 0.3;
+          score += 0.05;
         }
         return { horse: horse, score: score };
       });
