@@ -665,6 +665,9 @@
           </div>
         </div>
       `;
+      // スマホでも演出が見えるように、演出のところまで自動でスクロールする
+      result.scrollIntoView({ behavior: "smooth", block: "start" });
+
       const roulette = document.getElementById("roulette");
       const img = document.getElementById("rouletteImg");
       const runner = document.getElementById("runner");
@@ -960,6 +963,9 @@
         <hr>
         <div class="illust" id="illust"></div>
       `;
+
+      // レシートのいちばん上まで自動でスクロールする
+      result.scrollIntoView({ behavior: "smooth", block: "start" });
 
       // イラストを組み立てる
       buildIllustration(document.getElementById("illust"), horse, style, luckyColor.hex);
