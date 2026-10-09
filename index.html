@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>旅の運勢占い</title>
+  <!-- ニックネームと馬の名前に使う日本語のフォント（Googleの無料フォント。必要な文字だけ読み込まれる） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Hachi+Maru+Pop&family=Mochiy+Pop+One&display=swap" rel="stylesheet">
   <style>
     /* 馬の名前に使う筆記体のフォント「Great Vibes」（無料で使えるOFLライセンス）。
        フォルダーがなくても動くように、ファイルの中身をそのまま埋め込んでいる */
@@ -39,7 +43,7 @@
       margin-top: 8px;
       font-family: inherit;
     }
-    #birthdayText, textarea {
+    #birthdayText, #nickname, textarea {
       width: 100%;
       max-width: 320px;
       box-sizing: border-box;
@@ -241,16 +245,55 @@
       opacity: 0.3;
       filter: blur(14px);
     }
-    /* 馬の名前（筆記体） */
-    .illust-name {
+    /* 馬の名前とニックネーム（上のほうに重ねて表示） */
+    .illust-title {
       position: absolute;
       top: 2%;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: "Great Vibes", cursive;
-      line-height: 1.1;
-      white-space: nowrap;
+      left: 0;
+      right: 0;
+      text-align: center;
       z-index: 1;
+    }
+    .illust-name,
+    .illust-nick {
+      display: inline-block;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+    .illust-nick {
+      margin-top: 2px;
+    }
+    /* 文字の種類ごとのフォント */
+    .font-cursive  { font-family: "Great Vibes", cursive; }                       /* ローマ字：筆記体 */
+    .font-cool     { font-family: "Dela Gothic One", "Yu Gothic", sans-serif;      /* 漢字：太くて力強いかっこいい字 */
+                     letter-spacing: 0.04em; }
+    .font-cute     { font-family: "Hachi Maru Pop", "Yu Gothic", sans-serif;       /* ひらがな：丸いかわいい字 */
+                     -webkit-text-stroke: 0.06em currentColor; }                    /* 細いので、少し太くする */
+    .font-pop      { font-family: "Mochiy Pop One", "Yu Gothic", sans-serif; }     /* カタカナ：ぽってりかわいい字 */
+    /* イラストに入れる日付 */
+    .illust-dates {
+      position: absolute;
+      bottom: 3%;
+      z-index: 3;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background-color: rgba(255, 255, 255, 0.6);
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+    .illust-dates.on-left  { left: 3%;  text-align: left; }
+    .illust-dates.on-right { right: 3%; text-align: right; }
+    /* チェックボックスの並び */
+    .checks label {
+      display: inline-block;
+      margin: 6px 10px 0;
+      font-size: 17px;
+    }
+    .checks input {
+      width: 20px;
+      height: 20px;
+      vertical-align: -3px;
+      margin-right: 4px;
     }
     .illust-horse {
       position: absolute;
@@ -311,6 +354,11 @@
   <p>道の駅サラブレッドロード新冠</p>
 
   <div class="field">
+    <div>ニックネーム（なくてもOK）</div>
+    <input type="text" id="nickname" maxlength="12" placeholder="例：さくら、サクラ、桜子、Sakura">
+  </div>
+
+  <div class="field">
     <div>生年月日</div>
     <input type="date" id="birthday">
     <div class="or">または、数字で入力</div>
@@ -331,6 +379,13 @@
     <textarea id="moodText" rows="3" maxlength="100" placeholder="例：最近、仕事でやる気が出なくて困っています"></textarea>
   </div>
 
+  <div class="field checks">
+    <div>イラストに入れる日付（入れたいものにチェック）</div>
+    <label><input type="checkbox" id="showBirthday">誕生日</label>
+    <label><input type="checkbox" id="showToday">占った日</label>
+    <div class="or">どちらもチェックしなければ、日付は入りません</div>
+  </div>
+
   <button id="startButton">占いをはじめる</button>
   <div id="result"></div>
 
@@ -348,6 +403,9 @@
     const birthdayText = document.getElementById("birthdayText");
     const mood = document.getElementById("mood");
     const moodText = document.getElementById("moodText");
+    const nicknameInput = document.getElementById("nickname");
+    const showBirthday = document.getElementById("showBirthday");
+    const showToday = document.getElementById("showToday");
 
     // 運勢の星
     const fortunes = ["★★★★★", "★★★★☆", "★★★☆☆"];
@@ -755,26 +813,68 @@
       return box;
     }
 
-    // 馬の名前が枠からはみ出さないように、文字の大きさを合わせる道具
-    function fitName(nameText, container) {
+    // ニックネームの文字の種類を調べる道具
+    // "kanji"（漢字）・"hiragana"（ひらがな）・"katakana"（カタカナ）・"latin"（ローマ字）・"none"（なし）
+    function nicknameType(nick) {
+      if (nick === "") {
+        return "none";
+      }
+      if (/[\u4E00-\u9FFF\u3400-\u4DBF々]/.test(nick)) {
+        return "kanji";
+      }
+      const hira = (nick.match(/[\u3041-\u309F]/g) || []).length;
+      const kata = (nick.match(/[\u30A1-\u30FA\uFF66-\uFF9D]/g) || []).length;
+      if (hira > 0 || kata > 0) {
+        return hira >= kata ? "hiragana" : "katakana";
+      }
+      return "latin";
+    }
+
+    // カタカナをひらがなにする道具（ドリームジャーニー → どりーむじゃーにー）
+    function toHiragana(text) {
+      return text.replace(/[\u30A1-\u30F6]/g, function (ch) {
+        return String.fromCharCode(ch.charCodeAt(0) - 0x60);
+      });
+    }
+
+    // ニックネームの種類に合わせて、馬の名前の書き方とフォントを決める道具
+    function titleStyle(type, horse) {
+      if (type === "kanji") {
+        return { horseName: horse.name, font: "font-cool", family: "Dela Gothic One" };
+      }
+      if (type === "hiragana") {
+        return { horseName: toHiragana(horse.name), font: "font-cute", family: "Hachi Maru Pop" };
+      }
+      if (type === "katakana") {
+        return { horseName: horse.name, font: "font-pop", family: "Mochiy Pop One" };
+      }
+      return { horseName: horse.en || horse.name, font: "font-cursive", family: "Great Vibes" };
+    }
+
+    // 文字が枠からはみ出さないように、大きさを合わせる道具
+    // maxRatio：枠の幅に対して、いちばん大きいときの文字の大きさ
+    function fitText(el, container, maxRatio, family) {
       function fit() {
         const maxWidth = container.clientWidth * 0.92;
-        let size = container.clientWidth * 0.24;   // いちばん大きいとき
-        nameText.style.fontSize = size + "px";
-        while (nameText.offsetWidth > maxWidth && size > 12) {
+        let size = container.clientWidth * maxRatio;
+        el.style.fontSize = size + "px";
+        while (el.offsetWidth > maxWidth && size > 10) {
           size -= 1;
-          nameText.style.fontSize = size + "px";
+          el.style.fontSize = size + "px";
         }
       }
       fit();
       // フォントの読み込みが終わったら、もう一度合わせる
       if (document.fonts) {
-        document.fonts.load('40px "Great Vibes"').then(fit);
+        document.fonts.load('40px "' + family + '"', el.textContent).then(fit).catch(function () {});
       }
     }
 
     // イラストを組み立てる道具
-    function buildIllustration(container, horse, style, colorHex) {
+    // dates：イラストに入れる日付の情報（{ birthday: {year,month,day} または null, today: Date または null }）
+    function buildIllustration(container, horse, style, colorHex, nickname, dates) {
+      nickname = nickname || "";
+      dates = dates || { birthday: null, today: null };
       // 背景の色（ラッキーカラーをやわらかくして使う）
       container.style.backgroundColor = softColor(colorHex, 0.45);
       const splashColors = [colorHex, softColor(colorHex, 0.3)].concat(baseSplashColors);
@@ -804,17 +904,38 @@
         container.appendChild(dot);
       }
 
-      // 馬の名前（ローマ字の筆記体）。長い名前ほど文字を小さくする
+      // 馬の名前とニックネーム。ニックネームの文字の種類でフォントが変わる
+      const type = nicknameType(nickname);
+      const look = titleStyle(type, horse);
+      const isJapanese = type === "kanji" || type === "hiragana" || type === "katakana";
+
+      const title = document.createElement("div");
+      title.className = "illust-title";
       const nameText = document.createElement("div");
-      nameText.className = "illust-name";
-      nameText.textContent = horse.en || horse.name;
-      nameText.style.color = deepColor(colorHex, 0.45);
-      container.appendChild(nameText);
-      fitName(nameText, container);
+      nameText.className = "illust-name " + look.font;
+      nameText.textContent = look.horseName;
+      nameText.style.color = deepColor(colorHex, isJapanese ? 0.6 : 0.45);
+      title.appendChild(nameText);
+      container.appendChild(title);
+      // 日本語は筆記体より字が大きく見えるので、少し小さめにする
+      fitText(nameText, container, isJapanese ? 0.14 : 0.24, look.family);
+
+      if (nickname !== "") {
+        title.appendChild(document.createElement("br"));
+        const nickText = document.createElement("div");
+        nickText.className = "illust-nick " + look.font;
+        nickText.textContent = type === "latin" ? "& " + nickname : "＆ " + nickname;
+        nickText.style.color = deepColor(colorHex, isJapanese ? 0.5 : 0.3);
+        title.appendChild(nickText);
+        fitText(nickText, container, isJapanese ? 0.09 : 0.14, look.family);
+      }
 
       // 相棒の馬（画像がなければ点線の枠）
       const horseImg = document.createElement("img");
       horseImg.className = "illust-horse";
+      if (nickname !== "") {
+        horseImg.style.height = "70%";   // ニックネームの分だけ、馬を少し小さくする
+      }
       horseImg.src = "images/horses/" + horse.id + ".png";
       horseImg.alt = horse.name;
       horseImg.onerror = function () {
@@ -837,10 +958,40 @@
         );
       };
       container.appendChild(charaImg);
+
+      // 日付（チェックしたものだけ）。キャラと重ならない側に置く
+      const lines = [];
+      if (dates.birthday) {
+        const b = dates.birthday;
+        lines.push(isJapanese
+          ? b.year + "." + b.month + "." + b.day + " 生まれ"
+          : "Born " + b.year + "." + b.month + "." + b.day);
+      }
+      if (dates.today) {
+        const t = dates.today;
+        const text = t.getFullYear() + "." + (t.getMonth() + 1) + "." + t.getDate();
+        lines.push(isJapanese ? text + " の相棒" : text);
+      }
+      if (lines.length > 0) {
+        const dateBox = document.createElement("div");
+        dateBox.className = "illust-dates " + look.font + (placement === "front" ? " on-right" : " on-left");
+        dateBox.style.color = deepColor(colorHex, isJapanese ? 0.6 : 0.45);
+        dateBox.style.fontSize = (container.clientWidth * (isJapanese ? 0.05 : 0.09)) + "px";
+        lines.forEach(function (line, i) {
+          if (i > 0) {
+            dateBox.appendChild(document.createElement("br"));
+          }
+          dateBox.appendChild(document.createTextNode(line));
+        });
+        container.appendChild(dateBox);
+      }
     }
 
     button.addEventListener("click", async function () {
       result.style.display = "block";
+
+      // ニックネーム（なくてもOK）
+      const nickname = nicknameInput.value.trim();
 
       // 気分：自由に書いた文があればそちらを優先、なければ選んだもの
       const moodValue = moodText.value.trim() || mood.value;
@@ -951,6 +1102,7 @@
         <div class="receipt-title">占い結果レシート</div>
         <hr>
         <p><span class="label">占った日時・場所</span><br>${dateText}<br>道の駅サラブレッドロード新冠</p>
+        ${nickname !== "" ? `<p><span class="label">ニックネーム</span><br>${escapeHtml(nickname)}</p>` : ""}
         <p><span class="label">生年月日</span><br>${year}年${month}月${day}日</p>
         <p><span class="label">気になること</span><br>${escapeHtml(moodValue)}</p>
         <hr>
@@ -969,7 +1121,10 @@
       result.scrollIntoView({ behavior: "smooth", block: "start" });
 
       // イラストを組み立てる
-      buildIllustration(document.getElementById("illust"), horse, style, luckyColor.hex);
+      buildIllustration(document.getElementById("illust"), horse, style, luckyColor.hex, nickname, {
+        birthday: showBirthday.checked ? { year: year, month: month, day: day } : null,
+        today: showToday.checked ? now : null
+      });
     });
   </script>
 </body>
