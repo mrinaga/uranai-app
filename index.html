@@ -37,13 +37,23 @@
       color: #777777;
       margin-top: 10px;
     }
+    .font-note {
+      line-height: 1.9;
+    }
+    .font-note span {
+      font-size: 15px;
+      color: #8a5b6b;
+    }
+    .font-note .font-cursive {
+      font-size: 20px;
+    }
     input, select, textarea {
       font-size: 18px;
       padding: 8px;
       margin-top: 8px;
       font-family: inherit;
     }
-    #birthdayText, #nickname, textarea {
+    #nickname, textarea {
       width: 100%;
       max-width: 320px;
       box-sizing: border-box;
@@ -356,13 +366,16 @@
   <div class="field">
     <div>ニックネーム（なくてもOK）</div>
     <input type="text" id="nickname" maxlength="12" placeholder="例：さくら、サクラ、桜子、Sakura">
+    <div class="or font-note">
+      ニックネームの文字で、イラストの字の雰囲気が変わります<br>
+      <span class="font-cool">漢字＝かっこいい</span>　<span class="font-cute">ひらがな＝かわいい</span><br>
+      <span class="font-pop">カタカナ＝ぽってり</span>　<span class="font-cursive">Romaji = cursive</span>
+    </div>
   </div>
 
   <div class="field">
     <div>生年月日</div>
     <input type="date" id="birthday">
-    <div class="or">または、数字で入力</div>
-    <input type="text" id="birthdayText" inputmode="numeric" placeholder="例：20000101 や 2000/1/1">
   </div>
 
   <div class="field">
@@ -380,10 +393,13 @@
   </div>
 
   <div class="field checks">
-    <div>イラストに入れる日付（入れたいものにチェック）</div>
+    <div>イラストに入れるもの（入れたいものにチェック）</div>
+    <label><input type="checkbox" id="showHorseName" checked>馬の名前</label>
+    <label><input type="checkbox" id="showNickname" checked>ニックネーム</label>
+    <br>
     <label><input type="checkbox" id="showBirthday">誕生日</label>
     <label><input type="checkbox" id="showToday">占った日</label>
-    <div class="or">どちらもチェックしなければ、日付は入りません</div>
+    <div class="or">チェックしなかったものは、イラストに入りません</div>
   </div>
 
   <button id="startButton">占いをはじめる</button>
@@ -400,10 +416,11 @@
     const button = document.getElementById("startButton");
     const result = document.getElementById("result");
     const birthday = document.getElementById("birthday");
-    const birthdayText = document.getElementById("birthdayText");
     const mood = document.getElementById("mood");
     const moodText = document.getElementById("moodText");
     const nicknameInput = document.getElementById("nickname");
+    const showHorseName = document.getElementById("showHorseName");
+    const showNickname = document.getElementById("showNickname");
     const showBirthday = document.getElementById("showBirthday");
     const showToday = document.getElementById("showToday");
 
@@ -662,27 +679,13 @@
         .replace(/／/g, "/");
     }
 
-    // 生年月日を読み取る道具（入力欄が優先、なければカレンダー）
+    // 生年月日を読み取る道具（カレンダーで選んだ日付を使う）
+    // 読み取れたら { year, month, day }、読み取れなければ null を返す
     function getBirthday() {
-      const typed = toHalfWidth(birthdayText.value).replace(/\s/g, "");
-      let year, month, day;
-
-      if (typed !== "") {
-        const match =
-          typed.match(/^(\d{4})(\d{2})(\d{2})$/) ||
-          typed.match(/^(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})日?$/);
-        if (!match) {
-          return null;
-        }
-        year = Number(match[1]);
-        month = Number(match[2]);
-        day = Number(match[3]);
-      } else {
-        const parts = birthday.value.split("-");
-        year = Number(parts[0]);
-        month = Number(parts[1]);
-        day = Number(parts[2]);
-      }
+      const parts = birthday.value.split("-");
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
 
       // 本当にある日付か確かめる（2月30日などをはじく）
       const check = new Date(year, month - 1, day);
@@ -875,6 +878,8 @@
     function buildIllustration(container, horse, style, colorHex, nickname, dates) {
       nickname = nickname || "";
       dates = dates || { birthday: null, today: null };
+      const showName = dates.showHorseName !== false;   // 馬の名前を入れるか
+      const showNick = dates.showNickname !== false && nickname !== "";   // ニックネームを入れるか
       // 背景の色（ラッキーカラーをやわらかくして使う）
       container.style.backgroundColor = softColor(colorHex, 0.45);
       const splashColors = [colorHex, softColor(colorHex, 0.3)].concat(baseSplashColors);
@@ -911,30 +916,39 @@
 
       const title = document.createElement("div");
       title.className = "illust-title";
-      const nameText = document.createElement("div");
-      nameText.className = "illust-name " + look.font;
-      nameText.textContent = look.horseName;
-      nameText.style.color = deepColor(colorHex, isJapanese ? 0.6 : 0.45);
-      title.appendChild(nameText);
       container.appendChild(title);
-      // 日本語は筆記体より字が大きく見えるので、少し小さめにする
-      fitText(nameText, container, isJapanese ? 0.14 : 0.24, look.family);
+      if (showName) {
+        const nameText = document.createElement("div");
+        nameText.className = "illust-name " + look.font;
+        nameText.textContent = look.horseName;
+        nameText.style.color = deepColor(colorHex, isJapanese ? 0.6 : 0.45);
+        title.appendChild(nameText);
+        // 日本語は筆記体より字が大きく見えるので、少し小さめにする
+        fitText(nameText, container, isJapanese ? 0.14 : 0.24, look.family);
+      }
 
-      if (nickname !== "") {
-        title.appendChild(document.createElement("br"));
+      if (showNick) {
+        if (showName) {
+          title.appendChild(document.createElement("br"));
+        }
         const nickText = document.createElement("div");
         nickText.className = "illust-nick " + look.font;
-        nickText.textContent = type === "latin" ? "& " + nickname : "＆ " + nickname;
+        // 馬の名前と並ぶときは「＆」をつけ、ニックネームだけのときはそのまま出す
+        const amp = showName ? (type === "latin" ? "& " : "＆ ") : "";
+        nickText.textContent = amp + nickname;
         nickText.style.color = deepColor(colorHex, isJapanese ? 0.5 : 0.3);
         title.appendChild(nickText);
-        fitText(nickText, container, isJapanese ? 0.09 : 0.14, look.family);
+        // ニックネームだけのときは、大きく出す
+        fitText(nickText, container, showName ? (isJapanese ? 0.09 : 0.14) : (isJapanese ? 0.14 : 0.24), look.family);
       }
 
       // 相棒の馬（画像がなければ点線の枠）
       const horseImg = document.createElement("img");
       horseImg.className = "illust-horse";
-      if (nickname !== "") {
-        horseImg.style.height = "70%";   // ニックネームの分だけ、馬を少し小さくする
+      if (showName && showNick) {
+        horseImg.style.height = "70%";   // 名前が2行になる分だけ、馬を少し小さくする
+      } else if (!showName && !showNick) {
+        horseImg.style.height = "84%";   // 名前を入れないときは、馬を大きくする
       }
       horseImg.src = "images/horses/" + horse.id + ".png";
       horseImg.alt = horse.name;
@@ -997,7 +1011,7 @@
       const moodValue = moodText.value.trim() || mood.value;
 
       // 入力チェック
-      if (birthday.value === "" && birthdayText.value.trim() === "") {
+      if (birthday.value === "") {
         result.innerHTML = "<p>生年月日を入れてね</p>";
         return;
       }
@@ -1008,7 +1022,7 @@
 
       const birthdayInfo = getBirthday();
       if (birthdayInfo === null) {
-        result.innerHTML = "<p>生年月日の書き方を確認してね<br>（例：20000101 や 2000/1/1）</p>";
+        result.innerHTML = "<p>生年月日を確認してね<br>（未来の日付などは選べません）</p>";
         return;
       }
 
@@ -1122,6 +1136,8 @@
 
       // イラストを組み立てる
       buildIllustration(document.getElementById("illust"), horse, style, luckyColor.hex, nickname, {
+        showHorseName: showHorseName.checked,
+        showNickname: showNickname.checked,
         birthday: showBirthday.checked ? { year: year, month: month, day: day } : null,
         today: showToday.checked ? now : null
       });
