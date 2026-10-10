@@ -224,6 +224,10 @@
     .label {
       font-weight: bold;
     }
+    #result .note {
+      font-size: 13px;
+      color: #777777;
+    }
     .swatch {
       display: inline-block;
       width: 14px;
@@ -293,6 +297,106 @@
     }
     .illust-dates.on-left  { left: 3%;  text-align: left; }
     .illust-dates.on-right { right: 3%; text-align: right; }
+    /* ===== キャラとの会話 ===== */
+    .chat {
+      display: none;
+      max-width: 380px;
+      margin: 10px auto;
+    }
+    .chat-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      min-height: 170px;
+    }
+    .chat-chara {
+      width: 110px;
+      flex-shrink: 0;
+      animation: hop 0.6s ease-in-out infinite alternate;
+    }
+    .bubble {
+      position: relative;
+      flex: 1;
+      background-color: white;
+      border: 3px solid #f0b8c9;
+      border-radius: 18px;
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 18px;
+      line-height: 1.6;
+      color: #333333;
+      min-height: 60px;
+      margin-bottom: 40px;
+    }
+    .bubble::before {
+      content: "";
+      position: absolute;
+      left: -20px;
+      bottom: 18px;
+      border: 8px solid transparent;
+      border-right: 12px solid #f0b8c9;
+    }
+    .mic {
+      min-height: 24px;
+      margin: 4px 0 10px;
+      font-size: 15px;
+      color: #d94f7a;
+      font-weight: bold;
+    }
+    .mic.listening::before {
+      content: "🎤 ";
+      animation: blink 1s infinite;
+    }
+    .chat-tools {
+      margin-top: 18px;
+    }
+    button.small {
+      font-size: 14px;
+      padding: 8px 16px;
+      margin: 4px;
+      background-color: white;
+      color: #d94f7a;
+      border: 2px solid #f0b8c9;
+    }
+    .choices label.picked {
+      background-color: #d94f7a;
+      border-color: #d94f7a;
+      color: white;
+    }
+    @keyframes blink {
+      50% { opacity: 0.3; }
+    }
+    /* 性格診断 */
+    .quiz .q {
+      margin: 14px 0 4px;
+      font-size: 16px;
+      color: #333333;
+    }
+    .choices {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      max-width: 360px;
+      margin: 0 auto;
+    }
+    .choices label {
+      flex: 1 1 40%;
+      padding: 10px 6px;
+      border: 2px solid #f0b8c9;
+      border-radius: 999px;
+      background-color: white;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .choices input {
+      display: none;
+    }
+    .choices label:has(input:checked) {
+      background-color: #d94f7a;
+      border-color: #d94f7a;
+      color: white;
+    }
     /* チェックボックスの並び */
     .checks label {
       display: inline-block;
@@ -363,6 +467,8 @@
   <h1>旅の相棒を見つけてみませんか？</h1>
   <p>道の駅サラブレッドロード新冠</p>
 
+  <!-- ===== 1. 入力画面 ===== -->
+  <div id="step1">
   <div class="field">
     <div>ニックネーム（なくてもOK）</div>
     <input type="text" id="nickname" maxlength="12" placeholder="例：さくら、サクラ、桜子、Sakura">
@@ -402,7 +508,23 @@
     <div class="or">チェックしなかったものは、イラストに入りません</div>
   </div>
 
-  <button id="startButton">占いをはじめる</button>
+  <button id="startButton">次へ（相棒とおしゃべり）</button>
+  </div>
+
+  <!-- ===== 2. キャラとの会話（声でもタッチでも答えられる） ===== -->
+  <div id="chatStep" class="chat">
+    <div class="chat-row">
+      <img id="chatChara" class="chat-chara" src="images/character/wave.png" alt="">
+      <div class="bubble" id="bubble"></div>
+    </div>
+    <div class="mic" id="micStatus"></div>
+    <div class="choices" id="chatChoices"></div>
+    <div class="chat-tools">
+      <button type="button" class="small" id="voiceToggle">🔊 声：オン</button>
+      <button type="button" class="small" id="backButton">入力にもどる</button>
+    </div>
+  </div>
+
   <div id="result"></div>
 
   <script>
@@ -445,15 +567,32 @@
     };
 
     // 新冠のラッキープレイスとグルメ（本番では道の駅と相談して決める）
-    const luckyPlaces = ["サラブレッド銀座", "レ・コード館", "判官館森林公園", "新冠温泉 レ・コードの湯"];
-    const luckyFoods = ["ソフトクリーム", "新冠産ピーマンを使ったメニュー", "道の駅のおみやげスイーツ"];
+    // name：名前（AIにも渡す）、note：レシートに出すひとこと説明
+    // ※値段やメニューは変わることがあるので、本番の前に道の駅の方に確認する
+    const luckyPlaces = [
+      { name: "サラブレッド銀座", note: "約8kmにわたって牧場が並ぶ道。放牧中のサラブレッドに会えるかも" },
+      { name: "レ・コード館", note: "レコードの博物館。展望塔から牧場と太平洋を一望" },
+      { name: "新冠温泉 レ・コードの湯", note: "太平洋に沈む夕日を眺められる天然温泉" },
+      { name: "判官館森林公園", note: "キャンプ場もある、海沿いの森の公園" },
+      { name: "太陽の森 ディマシオ美術館", note: "世界最大級の油彩画に出会える美術館" },
+      { name: "にいかっぷホロシリ乗馬クラブ", note: "元競走馬に乗って森をお散歩。初心者向けの体験もあり" },
+      { name: "道の駅サラブレッドロード新冠", note: "名馬ハイセイコーの銅像と記念撮影を" },
+      { name: "岩清水渓谷", note: "約26kmつづく渓谷。秋の紅葉が見事" }
+    ];
+    const luckyFoods = [
+      { name: "にいかっぷピーマンソフトクリーム", note: "道の駅の売店でいちばん人気。苦みはほとんどなし" },
+      { name: "ピーマンどら焼き", note: "生地にピーマンを練りこんだ、道の駅限定のどら焼き" },
+      { name: "焼きカレー", note: "道の駅のレストランで味わえる一皿" },
+      { name: "ジンギスカン定食", note: "道の駅のレストランの人気メニュー" },
+      { name: "ばふん饅頭", note: "名前がユニークな、道の駅のおみやげ" },
+      { name: "ベンチタイムのサケのピラフ", note: "地元の牛乳のソフトクリームも名物のカフェ" },
+      { name: "ラーメン 喜一郎", note: "新冠のまちで愛されるラーメン屋さん" },
+      { name: "椿サロン 夕焼け店のケーキ", note: "海が見える高台のカフェで、ひと休み" }
+    ];
 
     // 走り方の種類
     const styles = ["逃げ", "先行", "差し", "追込"];
 
-    // 誕生月と毛色の対応（資料2-6の表。1月から順番に12個）
-    const monthColors = ["栗毛", "鹿毛", "黒鹿毛", "青鹿毛", "青毛", "栃栗毛",
-                         "芦毛", "白毛", "栗毛", "鹿毛", "黒鹿毛", "芦毛"];
 
     // 登録馬（デモ用27頭）。id は画像のファイル名に使う
     const horses = [
@@ -519,25 +658,18 @@
     }
 
     // その人の性格を出す道具（生年月日から2つ、今日の気分から1つ）
-    function getPersonTraits(year, month, day, moodValue) {
-      const seed = year * 37 + month * 31 + day * 7;
-      const first = traitTypes[seed % traitTypes.length];
-      let second = traitTypes[Math.floor(seed / traitTypes.length) % traitTypes.length];
-      if (second === first) {
-        second = traitTypes[(traitTypes.indexOf(first) + 3) % traitTypes.length];
-      }
-
+    // その人の性格を出す道具（性格診断の Q1・Q2 と、今日の気分から）
+    function getPersonTraits(q1, q2, moodValue) {
       const traits = {};
-      traits[first.key] = 1.0;
-      traits[second.key] = 0.6;
+      traits[q1] = (traits[q1] || 0) + 1.0;
+      traits[q2] = (traits[q2] || 0) + 1.0;
 
       // 気分から出る性格（見つからなければ足さない）
       const found = moodTraits.find(function (m) {
         return m.words.some(function (w) { return moodValue.includes(w); });
       });
-      // 気分の影響をいちばん強くして、気分を変えると相棒も変わるようにしている
       if (found) {
-        traits[found.key] = (traits[found.key] || 0) + 1.2;
+        traits[found.key] = (traits[found.key] || 0) + 1.0;
       }
 
       // 強い順に並べた名前（レシート用）
@@ -548,6 +680,22 @@
         });
 
       return { traits: traits, labels: labels };
+    }
+
+    // 性格診断の答え（キャラとの会話で入る）
+    const quizAnswers = { q1: "", q2: "", q3: "" };
+    function answerOf(name) {
+      return quizAnswers[name] || "";
+    }
+
+    // 答えの組み合わせから番号を作る道具（同じ答えなら、いつも同じ番号）
+    function answerSeed(q1, q2, style, moodValue) {
+      const text = q1 + "|" + q2 + "|" + style + "|" + moodValue;
+      let n = 0;
+      for (let i = 0; i < text.length; i++) {
+        n = (n * 31 + text.charCodeAt(i)) % 100000;
+      }
+      return n;
     }
 
     // 2つの性格がどれくらい似ているかを0〜1の点数にする道具
@@ -567,35 +715,28 @@
     }
 
     // 性格と走り方が近い馬を選ぶ道具（資料2-6のルール）
-    function chooseHorse(person, style, monthColor, day) {
-      // ルール1・2：性格の近さ＋走り方が同じなら加点
+    // 毛色は使わず、性格の近さと走り方だけで選ぶ
+    // 点数がほぼ同じ馬が何頭かいるときだけ、生まれた「日」で1頭に決める
+    // seed：答えの組み合わせから作る番号。候補の中から1頭に決めるのに使う
+    function chooseHorse(person, style, seed) {
+      // 性格の近さ＋走り方が同じなら少し加点
       const scored = horses.map(function (horse) {
         let score = similarity(person.traits, horseTraits(horse));
         if (horse.styles.includes(style)) {
-          score += 0.05;
+          score += 0.15;
         }
         return { horse: horse, score: score };
       });
       scored.sort(function (a, b) { return b.score - a.score; });
 
-      // 一番の点数に近い馬を「似た性格の候補」にする
+      // いちばんの点数に近い馬（0.15点差まで）を候補にして、答えの組み合わせで1頭に決める
+      // この数字を小さくすると「いちばん似ている馬」が出やすく、大きくするといろいろな馬が出やすくなる
       const best = scored[0].score;
-      let candidates = scored.filter(function (s) { return s.score >= best - 0.12; });
-
-      // ルール4：候補が4頭以上なら、誕生月の毛色で絞り込む
-      if (candidates.length >= 4) {
-        const sameColor = candidates.filter(function (s) { return s.horse.color === monthColor; });
-        // ルール5：毛色が合う馬がいなければ、性格と走り方が一番近い馬にする
-        candidates = sameColor.length > 0 ? sameColor : [candidates[0]];
-      }
-
-      // 同じ点数の馬が何頭かいたら、生まれた「日」で1頭に決める
-      const top = candidates[0].score;
-      const ties = candidates.filter(function (s) { return s.score >= top - 0.0001; });
-      const chosen = ties[day % ties.length].horse;
+      const ties = scored.filter(function (s) { return s.score >= best - 0.15; });
+      const chosen = ties[seed % ties.length].horse;
 
       // 確認用（F12のConsoleにだけ表示される）
-      console.log("あなたの性格:", person.labels.join("・"), "／走り方:", style, "／誕生月の毛色:", monthColor);
+      console.log("あなたの性格:", person.labels.join("・"), "／走り方:", style);
       console.log("点数の高い馬:", scored.slice(0, 6).map(function (s) {
         return s.horse.name + " " + s.score.toFixed(2);
       }).join(", "));
@@ -1001,7 +1142,8 @@
       }
     }
 
-    button.addEventListener("click", async function () {
+    // 占いの本体（会話で3つの質問に答え終わったら動く）
+    async function runFortune() {
       result.style.display = "block";
 
       // ニックネーム（なくてもOK）
@@ -1019,6 +1161,10 @@
         result.innerHTML = "<p>今日の気分を選ぶか、自由に書いてね</p>";
         return;
       }
+      if (!answerOf("q1") || !answerOf("q2") || !answerOf("q3")) {
+        result.innerHTML = "<p>性格診断の3つの質問に答えてね</p>";
+        return;
+      }
 
       const birthdayInfo = getBirthday();
       if (birthdayInfo === null) {
@@ -1030,17 +1176,17 @@
       const month = birthdayInfo.month;
       const day = birthdayInfo.day;
 
-      // 仮の判定：生年月日の数字を足して、4で割った余りで走り方を決める
-      const style = styles[(year + month + day) % 4];
+      // ===== 性格診断の答え =====
+      const q1 = answerOf("q1");
+      const q2 = answerOf("q2");
+      const style = answerOf("q3");   // Q3 の答えが、そのまま走り方になる
 
       // ===== その人の性格を出す =====
-      const person = getPersonTraits(year, month, day, moodValue);
+      const person = getPersonTraits(q1, q2, moodValue);
 
-      // 誕生月の毛色
-      const monthColor = monthColors[month - 1];
-
-      // ===== 性格の近さで馬を選ぶ =====
-      const horse = chooseHorse(person, style, monthColor, day);
+      // ===== 性格と走り方が近い馬を選ぶ =====
+      const seed = answerSeed(q1, q2, style, moodValue);
+      const horse = chooseHorse(person, style, seed);
 
       // 占った日時
       const now = new Date();
@@ -1070,8 +1216,8 @@
           horseColor: horse.color,
           horsePersonality: horse.personality,
           personTraits: person.labels.join("・"),
-          luckyPlace: place,
-          luckyFood: food
+          luckyPlace: place.name,
+          luckyFood: food.name
         })
       })
         .then(function (response) {
@@ -1121,8 +1267,8 @@
         <p><span class="label">気になること</span><br>${escapeHtml(moodValue)}</p>
         <hr>
         <p><span class="label">あなたの今日の運勢</span><br>${stars}<br>${advice}</p>
-        <p><span class="label">旅のラッキープレイス</span><br>${place}</p>
-        <p><span class="label">ラッキーグルメ</span><br>${food}</p>
+        <p><span class="label">旅のラッキープレイス</span><br>${place.name}<br><span class="note">${place.note}</span></p>
+        <p><span class="label">ラッキーグルメ</span><br>${food.name}<br><span class="note">${food.note}</span></p>
         <p><span class="label">ラッキーカラー</span><br><span class="swatch" style="background-color:${luckyColor.hex}"></span>${escapeHtml(luckyColor.name)}<br>${escapeHtml(luckyColor.reason)}</p>
         <hr>
         <p><span class="label">隠れた性格：走り方は「${style}」</span><br>あなたは「${person.labels.join("・")}」タイプ。${styleTexts[style]}</p>
@@ -1141,6 +1287,353 @@
         birthday: showBirthday.checked ? { year: year, month: month, day: day } : null,
         today: showToday.checked ? now : null
       });
+
+      // もう一度占うボタン
+      const again = document.createElement("button");
+      again.textContent = "もう一度占う";
+      again.style.marginTop = "16px";
+      again.onclick = function () { location.reload(); };
+      result.after(again);
+    }
+
+    // ===================================================
+    // キャラとの会話（声でもタッチでも答えられる）
+    // ===================================================
+    const step1 = document.getElementById("step1");
+    const chatStep = document.getElementById("chatStep");
+    const bubble = document.getElementById("bubble");
+    const chatChara = document.getElementById("chatChara");
+    const chatChoices = document.getElementById("chatChoices");
+    const micStatus = document.getElementById("micStatus");
+    const voiceToggle = document.getElementById("voiceToggle");
+
+    // 3つの質問。keys は「声で答えたとき」に探す言葉
+    const questions = [
+      {
+        name: "q1", pose: "wave",
+        text: "休みの日は、どう過ごしてる？",
+        options: [
+          { value: "wild",  label: "外に出かける",     keys: ["外", "出かけ", "でかけ", "おでかけ", "遊び", "あそび", "旅行", "アウトドア"] },
+          { value: "calm",  label: "家でのんびり",     keys: ["家", "いえ", "うち", "のんびり", "ゆっくり", "ごろごろ", "寝"] },
+          { value: "smart", label: "計画を立てる",     keys: ["計画", "けいかく", "予定", "よてい", "考え", "かんがえ", "調べ"] },
+          { value: "hard",  label: "コツコツ練習する", keys: ["コツコツ", "こつこつ", "練習", "れんしゅう", "勉強", "べんきょう", "特訓", "トレーニング"] }
+        ],
+        reply: "…なるほどな。"
+      },
+      {
+        name: "q2", pose: "think",
+        text: "仲間の中では、どんなタイプだ？",
+        options: [
+          { value: "proud",  label: "みんなを引っぱる", keys: ["引っぱ", "引っ張", "ひっぱ", "リーダー", "まとめ"] },
+          { value: "sweet",  label: "だれかに頼りたい", keys: ["頼り", "頼る", "たより", "たよる", "甘え", "あまえ"] },
+          { value: "gentle", label: "気配り役",         keys: ["気配り", "きくばり", "気を配", "気をくば", "やさし", "優し", "サポート"] },
+          { value: "calm",   label: "マイペース",       keys: ["マイペース", "まいぺーす", "自分のペース"] }
+        ],
+        reply: "そうか。悪くない。"
+      },
+      {
+        name: "q3", pose: "jump",
+        text: "最後だ。何かに挑戦するとき、どうする？",
+        options: [
+          { value: "逃げ", label: "まず飛びこむ",     keys: ["飛び", "とび", "飛ぶ", "すぐ", "とりあえず"] },
+          { value: "先行", label: "しっかり準備",     keys: ["準備", "じゅんび", "しっかり", "用意"] },
+          { value: "差し", label: "様子を見てから",   keys: ["様子", "ようす", "見て", "みて", "観察"] },
+          { value: "追込", label: "最後に追い上げる", keys: ["最後", "さいご", "追い上げ", "おいあげ", "追いあげ", "後から", "あとから"] }
+        ],
+        reply: "…わかった。"
+      }
+    ];
+
+    // 番号で答えたとき（1〜4）。それぞれの番号の言い方
+    const numberWords = [
+      ["1", "一", "いち", "いっ", "ひとつ", "ひとつめ", "いちばん", "ワン"],
+      ["2", "二", "に", "にい", "にー", "ふたつ", "ふたつめ", "にばん", "ツー"],
+      ["3", "三", "さん", "みっつ", "みっつめ", "さんばん", "スリー"],
+      ["4", "四", "よん", "よ", "し", "よっつ", "よっつめ", "よんばん", "よばん", "フォー"]
+    ];
+
+    // 聞こえた言葉から「何番か」を探す（見つからなければ -1）
+    function matchNumber(raw) {
+      // 全角の数字を半角にして、空白や「です」「かな」などを取る
+      let text = raw.replace(/[０-９]/g, function (ch) {
+        return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+      });
+      text = text.replace(/[\s、。！？!?.,]/g, "");
+      text = text.replace(/(番号|ばんごう|ナンバー)/g, "");
+      text = text.replace(/(です|でお願いします|お願いします|おねがいします|にします|がいい|かな|かも|で|ね|よ|！)+$/g, "");
+
+      // 「2番」「2番目」「3つ目」「4個目」のような言い方
+      let m = text.match(/([1-4一二三四])(番|ばん|つ目|つめ|個目|こめ)/);
+      if (m) {
+        return "1一2二3三4四".indexOf(m[1]) >> 1;
+      }
+      // 「いち番」「さん番目」のように、ひらがなの数字＋番
+      m = text.match(/(いち|に|さん|よん|よ)(番|ばん)/);
+      if (m) {
+        return { "いち": 0, "に": 1, "さん": 2, "よん": 3, "よ": 3 }[m[1]];
+      }
+      // 「いちばん」「にばん」「さんばん」「よんばん」
+      for (let n = 0; n < 4; n++) {
+        const kana = ["いちばん", "にばん", "さんばん", "よんばん"][n];
+        if (text.includes(kana) || (n === 3 && text.includes("よばん"))) {
+          return n;
+        }
+      }
+      // 番号だけを言ったとき（「1」「に」「さん」など）
+      for (let n = 0; n < 4; n++) {
+        if (numberWords[n].includes(text)) {
+          return n;
+        }
+      }
+      return -1;
+    }
+
+    // ----- 声で話す（読み上げ） -----
+    let voiceOn = "speechSynthesis" in window;
+    let jaVoice = null;
+    // 日本語の男性の声を優先して選ぶ（機種によって入っている声がちがう）
+    // Windows：Keita・Ichiro、iPhone・Mac：Otoya・Hattori など
+    const maleVoiceNames = ["Keita", "Ichiro", "Otoya", "Hattori", "Daichi", "Naoki", "Takumi", "男性", "Male"];
+    function pickVoice() {
+      const voices = speechSynthesis.getVoices().filter(function (v) {
+        return v.lang === "ja-JP" || v.lang === "ja_JP" || v.lang.indexOf("ja") === 0;
+      });
+      jaVoice = voices.find(function (v) {
+        return maleVoiceNames.some(function (name) { return v.name.indexOf(name) !== -1; });
+      }) || voices[0] || null;
+    }
+    if ("speechSynthesis" in window) {
+      pickVoice();
+      speechSynthesis.onvoiceschanged = pickVoice;
+    }
+
+    // ふきだしに文字を出しながら話す。話し終わったら次へ進む
+    function say(text) {
+      bubble.textContent = "";
+      let i = 0;
+      const typing = setInterval(function () {
+        i++;
+        bubble.textContent = text.slice(0, i);
+        if (i >= text.length) {
+          clearInterval(typing);
+        }
+      }, 45);
+
+      return new Promise(function (resolve) {
+        const minTime = text.length * 45 + 400;   // 文字が出終わるまでは待つ
+        if (!voiceOn) {
+          setTimeout(resolve, minTime);
+          return;
+        }
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "ja-JP";
+        if (jaVoice) {
+          u.voice = jaVoice;
+        }
+        u.rate = 1.1;    // 少し速めに、テンポよく
+        u.pitch = 0.85;  // 少し低めで、クールな声に
+        const start = Date.now();
+        let done = false;
+        function finish() {
+          if (done) { return; }
+          done = true;
+          const rest = Math.max(0, minTime - (Date.now() - start));
+          setTimeout(resolve, rest);
+        }
+        u.onend = finish;
+        u.onerror = finish;
+        setTimeout(finish, text.length * 250 + 3000);   // 読み上げが止まったときの保険
+        speechSynthesis.speak(u);
+      });
+    }
+
+    // ----- 声を聞く（音声認識） -----
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let canListen = !!Recognition;
+    let recognizer = null;
+
+    // 1回だけ聞いて、聞こえた言葉の候補を返す（聞こえなければ空っぽ）
+    function listenOnce() {
+      return new Promise(function (resolve) {
+        if (!canListen || !voiceOn) {
+          resolve(null);
+          return;
+        }
+        recognizer = new Recognition();
+        recognizer.lang = "ja-JP";
+        recognizer.interimResults = false;
+        recognizer.maxAlternatives = 5;
+        const heard = [];
+        recognizer.onresult = function (e) {
+          for (let i = 0; i < e.results[0].length; i++) {
+            heard.push(e.results[0][i].transcript);
+          }
+        };
+        recognizer.onerror = function (e) {
+          // マイクが使えないときは、ボタンだけにする
+          if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
+            canListen = false;
+          }
+        };
+        recognizer.onend = function () {
+          recognizer = null;
+          resolve(heard);
+        };
+        try {
+          recognizer.start();
+        } catch (err) {
+          recognizer = null;
+          resolve(null);
+        }
+      });
+    }
+
+    function stopListening() {
+      if (recognizer) {
+        try { recognizer.abort(); } catch (err) {}
+        recognizer = null;
+      }
+    }
+
+    // 聞こえた言葉から、どの答えか探す（番号 → 答えの言葉 の順）
+    function matchAnswer(heardList, options) {
+      // まずは番号で答えたか
+      for (const heard of heardList) {
+        const n = matchNumber(heard);
+        if (n >= 0 && n < options.length) {
+          return options[n];
+        }
+      }
+      // 次に答えの言葉で探す
+      for (const heard of heardList) {
+        const text = heard.replace(/\s/g, "");
+        for (const opt of options) {
+          if (opt.keys.some(function (k) { return text.includes(k); })) {
+            return opt;
+          }
+        }
+      }
+      return null;
+    }
+
+    // ----- 1つの質問をして、声かタッチで答えてもらう -----
+    function ask(q) {
+      return new Promise(async function (resolve) {
+        let answered = false;
+        chatChara.src = "images/character/" + q.pose + ".png";
+
+        // 答えのボタン
+        chatChoices.innerHTML = "";
+        q.options.forEach(function (opt, n) {
+          const label = document.createElement("label");
+          label.textContent = (n + 1) + ". " + opt.label;
+          label.onclick = function () { choose(opt); };
+          opt.el = label;
+          chatChoices.appendChild(label);
+        });
+
+        function choose(opt) {
+          if (answered) { return; }
+          answered = true;
+          stopListening();
+          micStatus.classList.remove("listening");
+          micStatus.textContent = "";
+          opt.el.classList.add("picked");
+          quizAnswers[q.name] = opt.value;
+          setTimeout(function () { resolve(opt); }, 500);
+        }
+
+        await say(q.text);
+
+        // 答えが決まるまで、声を聞き続ける
+        let retry = 0;
+        while (!answered) {
+          if (!canListen || !voiceOn) {
+            micStatus.classList.remove("listening");
+            micStatus.textContent = "ボタンをタッチして答えてね";
+            return;   // ボタンで答えるのを待つ
+          }
+          micStatus.textContent = "声で答えて（ボタンでもOK）";
+          micStatus.classList.add("listening");
+          const heard = await listenOnce();
+          if (answered) { return; }
+          micStatus.classList.remove("listening");
+          if (heard && heard.length > 0) {
+            const opt = matchAnswer(heard, q.options);
+            if (opt) {
+              choose(opt);
+              return;
+            }
+            retry++;
+            await say(retry < 3 ? "…聞こえなかった。もう一回頼む。" : "ボタンで選んでもいいぞ。");
+            if (answered) { return; }
+          }
+        }
+      });
+    }
+
+    // ----- 会話の流れ -----
+    async function startChat() {
+      step1.style.display = "none";
+      chatStep.style.display = "block";
+      chatStep.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      const nick = nicknameInput.value.trim();
+      chatChara.src = "images/character/wave.png";
+      await say((nick !== "" ? nick + "、" : "") + "…よし。今日の相棒、一緒に探すぞ。質問は3つだ。");
+
+      for (const q of questions) {
+        await ask(q);
+        chatChoices.innerHTML = "";
+        await say(q.reply);
+      }
+
+      chatChara.src = "images/character/run.png";
+      await say("よし、決まりだ。相棒を探してくる。待ってろ。");
+      chatStep.style.display = "none";
+      runFortune();
+    }
+
+    // 「次へ」ボタン：入力をたしかめてから、会話をはじめる
+    button.addEventListener("click", function () {
+      result.style.display = "block";
+      const moodValue = moodText.value.trim() || mood.value;
+      if (birthday.value === "") {
+        result.innerHTML = "<p>生年月日を入れてね</p>";
+        return;
+      }
+      if (getBirthday() === null) {
+        result.innerHTML = "<p>生年月日を確認してね<br>（未来の日付などは選べません）</p>";
+        return;
+      }
+      if (moodValue === "") {
+        result.innerHTML = "<p>今日の気分を選ぶか、自由に書いてね</p>";
+        return;
+      }
+      result.innerHTML = "";
+      result.style.display = "none";
+      startChat();
+    });
+
+    // 声のオン・オフ
+    voiceToggle.addEventListener("click", function () {
+      voiceOn = !voiceOn;
+      voiceToggle.textContent = voiceOn ? "🔊 声：オン" : "🔇 声：オフ";
+      if (!voiceOn) {
+        if ("speechSynthesis" in window) { speechSynthesis.cancel(); }
+        stopListening();
+        micStatus.classList.remove("listening");
+        micStatus.textContent = "ボタンをタッチして答えてね";
+      }
+    });
+    if (!("speechSynthesis" in window)) {
+      voiceToggle.style.display = "none";
+    }
+
+    // 入力にもどる
+    document.getElementById("backButton").addEventListener("click", function () {
+      location.reload();
     });
   </script>
 </body>
